@@ -5,13 +5,28 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import time
 import json
+import os
 
 app = Flask(__name__)
 
-def get_form_fields(url):
-    """Extract form fields from a Google Form URL."""
+def get_chrome_options():
+    """Configure Chrome options for both local and production environments."""
     options = uc.ChromeOptions()
     options.headless = True
+    options.add_argument('--no-sandbox')
+    options.add_argument('--headless')
+    options.add_argument('--disable-dev-shm-usage')
+    
+    # Set binary location based on environment
+    chrome_binary = os.getenv('CHROME_BIN', '/usr/bin/chromium')
+    if chrome_binary:
+        options.binary_location = chrome_binary
+    
+    return options
+
+def get_form_fields(url):
+    """Extract form fields from a Google Form URL."""
+    options = get_chrome_options()
     driver = uc.Chrome(options=options)
     
     try:
@@ -65,8 +80,7 @@ def get_form_fields(url):
 
 def fill_form(url, form_data):
     """Fill and submit a Google Form with provided data."""
-    options = uc.ChromeOptions()
-    options.headless = True
+    options = get_chrome_options()
     driver = uc.Chrome(options=options)
     
     try:

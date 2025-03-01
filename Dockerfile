@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y \
 ENV PYTHONUNBUFFERED=1
 ENV CHROME_BIN=/usr/bin/chromium
 ENV CHROMEDRIVER_PATH=/usr/bin/chromedriver
+ENV DISPLAY=:99
 
 # Set working directory
 WORKDIR /app
