@@ -1,5 +1,7 @@
 from flask import Flask, request, jsonify
-import undetected_chromedriver as uc
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -11,28 +13,19 @@ app = Flask(__name__)
 
 def get_chrome_options():
     """Configure Chrome options for both local and production environments."""
-    options = uc.ChromeOptions()
-    options.headless = True
+    options = Options()
+    options.add_argument('--headless')
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
     options.add_argument('--disable-gpu')
-    options.add_argument('--remote-debugging-port=9222')
-    
-    # Set binary location based on environment
-    chrome_binary = os.getenv('CHROME_BIN', '/usr/bin/google-chrome')
-    options.binary_location = chrome_binary
-    
     return options
 
 def create_driver():
     """Create and return a Chrome driver instance."""
     options = get_chrome_options()
     try:
-        driver = uc.Chrome(
-            options=options,
-            browser_executable_path=options.binary_location,
-            version_main=114  # Specify the major version of Chrome
-        )
+        service = Service()
+        driver = webdriver.Chrome(service=service, options=options)
         return driver
     except Exception as e:
         print(f"Error creating driver: {str(e)}")
