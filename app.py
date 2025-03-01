@@ -18,6 +18,7 @@ def get_chrome_options():
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
     options.add_argument('--disable-gpu')
+    options.add_argument('--window-size=1920,1080')  # Set a proper window size
     return options
 
 def create_driver():
@@ -31,16 +32,25 @@ def create_driver():
         print(f"Error creating driver: {str(e)}")
         raise
 
+def wait_and_find_element(driver, by, value, timeout=10):
+    """Wait for an element to be present and return it."""
+    wait = WebDriverWait(driver, timeout)
+    return wait.until(EC.presence_of_element_located((by, value)))
+
+def wait_and_find_elements(driver, by, value, timeout=10):
+    """Wait for elements to be present and return them."""
+    wait = WebDriverWait(driver, timeout)
+    return wait.until(EC.presence_of_all_elements_located((by, value)))
+
 def get_form_fields(url):
     """Extract form fields from a Google Form URL."""
     driver = create_driver()
     
     try:
         driver.get(url)
-        time.sleep(3)  # Initial wait for form to load
         
-        # Find all form questions
-        questions = driver.find_elements(By.CSS_SELECTOR, 'div[role="listitem"]')
+        # Wait for questions to load
+        questions = wait_and_find_elements(driver, By.CSS_SELECTOR, 'div[role="listitem"]')
         form_fields = []
         
         for index, question in enumerate(questions):
@@ -90,14 +100,14 @@ def fill_form(url, form_data):
     
     try:
         driver.get(url)
-        time.sleep(3)  # Initial wait for form to load
         
-        # Process each form field
-        questions = driver.find_elements(By.CSS_SELECTOR, 'div[role="listitem"]')
+        # Wait for form to load
+        questions = wait_and_find_elements(driver, By.CSS_SELECTOR, 'div[role="listitem"]')
         
         for question in questions:
             try:
-                question_text = question.find_element(By.CSS_SELECTOR, 'div[role="heading"] span.M7eMe').text
+                # Wait for question text to be visible
+                question_text = wait_and_find_element(question, By.CSS_SELECTOR, 'div[role="heading"] span.M7eMe').text
                 
                 # Find matching answer in form_data
                 if question_text in form_data:
@@ -105,35 +115,63 @@ def fill_form(url, form_data):
                     
                     # Handle text input
                     try:
-                        input_field = question.find_element(By.CSS_SELECTOR, 'input[type="text"]')
+                        input_field = wait_and_find_element(question, By.CSS_SELECTOR, 'input[type="text"]')
+                        input_field.clear()  # Clear any existing text
                         input_field.send_keys(answer)
+                        # Wait for text to be entered
+                        WebDriverWait(driver, 5).until(
+                            lambda d: input_field.get_attribute('value') == answer
+                        )
                         continue
                     except:
                         pass
                     
                     # Handle radio buttons
                     try:
-                        radio_group = question.find_element(By.CSS_SELECTOR, 'div[role="radiogroup"]')
-                        radio_button = radio_group.find_element(
+                        radio_group = wait_and_find_element(question, By.CSS_SELECTOR, 'div[role="radiogroup"]')
+                        radio_button = wait_and_find_element(
+                            radio_group,
                             By.CSS_SELECTOR, 
                             f'div[role="radio"][data-value="{answer}"]'
                         )
+                        # Scroll the radio button into view
+                        driver.execute_script("arguments[0].scrollIntoView(true);", radio_button)
+                        time.sleep(1)  # Small pause for stability
                         radio_button.click()
-                    except:
-                        pass
+                        # Wait for radio button to be selected
+                        WebDriverWait(driver, 5).until(
+                            lambda d: radio_button.get_attribute('aria-checked') == 'true'
+                        )
+                    except Exception as e:
+                        print(f"Error with radio button: {str(e)}")
                         
             except Exception as e:
                 print(f"Error filling question: {str(e)}")
         
-        # Submit form
-        submit_button = driver.find_element(
+        # Find and scroll to submit button
+        submit_button = wait_and_find_element(
+            driver,
             By.XPATH, 
             '//div[@role="button"]//span[text()="Submit"]'
         )
-        submit_button.click()
-        time.sleep(2)  # Wait for submission
+        driver.execute_script("arguments[0].scrollIntoView(true);", submit_button)
+        time.sleep(1)  # Small pause for stability
         
-        return True
+        # Click submit
+        submit_button.click()
+        
+        # Wait for submission confirmation
+        try:
+            confirmation = wait_and_find_element(
+                driver,
+                By.XPATH,
+                '//*[contains(text(), "Your response has been recorded")]',
+                timeout=10
+            )
+            return True
+        except:
+            print("Could not find submission confirmation")
+            return False
         
     except Exception as e:
         print(f"Error submitting form: {str(e)}")
@@ -169,7 +207,7 @@ def submit_form():
         if success:
             return jsonify({'message': 'Form submitted successfully'})
         else:
-            return jsonify({'error': 'Failed to submit form'}), 500
+            return jsonify({'error': 'Failed to submit form - could not verify submission'}), 500
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
