@@ -14,20 +14,33 @@ def get_chrome_options():
     options = uc.ChromeOptions()
     options.headless = True
     options.add_argument('--no-sandbox')
-    options.add_argument('--headless')
     options.add_argument('--disable-dev-shm-usage')
+    options.add_argument('--disable-gpu')
+    options.add_argument('--remote-debugging-port=9222')
     
     # Set binary location based on environment
-    chrome_binary = os.getenv('CHROME_BIN', '/usr/bin/chromium')
-    if chrome_binary:
-        options.binary_location = chrome_binary
+    chrome_binary = os.getenv('CHROME_BIN', '/usr/bin/google-chrome')
+    options.binary_location = chrome_binary
     
     return options
 
+def create_driver():
+    """Create and return a Chrome driver instance."""
+    options = get_chrome_options()
+    try:
+        driver = uc.Chrome(
+            options=options,
+            browser_executable_path=options.binary_location,
+            version_main=114  # Specify the major version of Chrome
+        )
+        return driver
+    except Exception as e:
+        print(f"Error creating driver: {str(e)}")
+        raise
+
 def get_form_fields(url):
     """Extract form fields from a Google Form URL."""
-    options = get_chrome_options()
-    driver = uc.Chrome(options=options)
+    driver = create_driver()
     
     try:
         driver.get(url)
@@ -80,8 +93,7 @@ def get_form_fields(url):
 
 def fill_form(url, form_data):
     """Fill and submit a Google Form with provided data."""
-    options = get_chrome_options()
-    driver = uc.Chrome(options=options)
+    driver = create_driver()
     
     try:
         driver.get(url)
